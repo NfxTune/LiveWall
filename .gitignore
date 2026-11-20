@@ -1,0 +1,15 @@
+# Generated .NET output and caches
+**/bin/
+**/obj/
+/dist/
+
+# Local runtime data
+**/settings.json
+**/logs/
+**/.appdata/
+**/.dotnet/
+
+# IDE state
+.vs/
+*.user
+*.suo

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Cyber Neon Particles Live Wallpaper</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            overflow: hidden;
+            user-select: none;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, #11111b 0%, #08080d 100%);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        .clock-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2;
+            text-align: center;
+            pointer-events: none;
+        }
+        .time {
+            font-size: 5.5rem;
+            font-weight: 300;
+            letter-spacing: 4px;
+            color: #cba6f7;
+            text-shadow: 0 0 20px rgba(203, 166, 247, 0.6), 0 0 40px rgba(137, 180, 250, 0.4);
+        }
+        .date {
+            font-size: 1.4rem;
+            letter-spacing: 2px;
+            color: #89b4fa;
+            margin-top: 5px;
+            text-transform: uppercase;
+            text-shadow: 0 0 10px rgba(137, 180, 250, 0.5);
+        }
+        .badge {
+            margin-top: 15px;
+            font-size: 0.85rem;
+            color: #6c7086;
+            letter-spacing: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="clock-container">
+        <div class="time" id="clock">00:00:00</div>
+        <div class="date" id="date">Thứ ... - Ngày ...</div>
+        <div class="badge">LIVE WALLPAPER STUDIO • WEBVIEW2 ENGINE</div>
+    </div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        // Đồng hồ thời gian thực
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('clock').textContent = `${hours}:${minutes}:${seconds}`;
+
+            const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+            const dayName = days[now.getDay()];
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+            document.getElementById('date').textContent = `${dayName}, ${day}/${month}/${year}`;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Hiệu ứng hạt Canvas lung linh
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        });
+
+        const particles = [];
+        const particleCount = 75;
+        const colors = ['#cba6f7', '#89b4fa', '#f5c2e7', '#a6e3a1', '#89dceb'];
+
+        class Particle {
+            constructor() {
+                this.reset();
+            }
+
+            reset() {
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.size = Math.random() * 2.5 + 1;
+                this.vx = (Math.random() - 0.5) * 0.8;
+                this.vy = (Math.random() - 0.5) * 0.8;
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+                this.alpha = Math.random() * 0.6 + 0.2;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+
+                if (this.x < 0 || this.x > width) this.vx *= -1;
+                if (this.y < 0 || this.y > height) this.vy *= -1;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        for (let i = 0; i < particleCount; i++) {
+            particles.push(new Particle());
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+
+            // Vẽ các đường nối giữa các hạt ở gần nhau
+            for (let i = 0; i < particles.length; i++) {
+                for (let j = i + 1; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+
+                    if (dist < 120) {
+                        ctx.save();
+                        ctx.globalAlpha = (1 - dist / 120) * 0.25;
+                        ctx.strokeStyle = particles[i].color;
+                        ctx.lineWidth = 0.8;
+                        ctx.beginPath();
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                }
+            }
+
+            // Cập nhật và vẽ từng hạt
+            for (const p of particles) {
+                p.update();
+                p.draw();
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
