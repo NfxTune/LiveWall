@@ -1,4 +1,4 @@
-# LiveWall
+# LiveWall V1
 
 Ứng dụng hình nền động cho Windows, viết bằng C# WinForms và dùng libmpv để phát video.
 
