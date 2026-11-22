@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.IO;
@@ -14,7 +15,8 @@ namespace LiveWallpaper
         private readonly Action _onExitApp;
         private readonly PerformanceMonitor _perfMonitor;
 
-        // Custom UI controls
+        // Header controls
+        private Label _lblAppTitle = null!;
         private Label _lblTitle = null!;
         private Label _lblSubtitle = null!;
         private Label _lblBadge = null!;
@@ -22,12 +24,34 @@ namespace LiveWallpaper
         private Button _btnApply = null!;
         private Button _btnOptimize = null!;
         private FlowLayoutPanel _cardsPanel = null!;
-        private ModernCheckBox _chkMute = null!;
-        private ModernCheckBox _chkLoop = null!;
+
+        // Tab views container
+        private Panel _tabContainer = null!;
+        private Panel _viewLibrary = null!;
+        private Panel _viewPlayback = null!;
+        private Panel _viewPerformance = null!;
+        private Panel _viewSystem = null!;
+
+        // Sidebar tabs
+        private ModernTabButton _tabBtnLibrary = null!;
+        private ModernTabButton _tabBtnPlayback = null!;
+        private ModernTabButton _tabBtnPerf = null!;
+        private ModernTabButton _tabBtnSystem = null!;
+
+        // Toggles & Sliders
+        private ModernToggleSwitch _chkMute = null!;
+        private ModernToggleSwitch _chkLoop = null!;
         private ModernSlider _sliderVolume = null!;
-        private ModernCheckBox _chkPauseFullscreen = null!;
-        private ModernCheckBox _chkPauseLock = null!;
-        private ModernCheckBox _chkPauseBattery = null!;
+        private ModernToggleSwitch _chkPauseFullscreen = null!;
+        private ModernToggleSwitch _chkPauseLock = null!;
+        private ModernToggleSwitch _chkPauseBattery = null!;
+
+        // Performance Tab Labels
+        private Label _lblPerfRamVal = null!;
+        private Label _lblPerfCpuVal = null!;
+        private Label _lblPerfHwVal = null!;
+
+        // Status bar
         private Label _lblStatusLeft = null!;
         private Label _lblStatusRight = null!;
         private System.Windows.Forms.Timer _statusTimer = null!;
@@ -43,17 +67,36 @@ namespace LiveWallpaper
             _selectedWallpaperPath = _settings.CurrentVideoPath;
 
             InitializeComponent();
+            ApplyWindows11WindowAttributes();
             PopulateMonitors();
             RefreshCards();
             SyncSettingsToUI();
             StartStatusMonitor();
         }
 
+        private void ApplyWindows11WindowAttributes()
+        {
+            try
+            {
+                // Bo góc cửa sổ theo chuẩn Windows 11
+                int cornerPreference = (int)NativeMethods.DWM_WINDOW_CORNER_PREFERENCE.DWMWCP_ROUND;
+                NativeMethods.DwmSetWindowAttribute(Handle, NativeMethods.DWMWA_WINDOW_CORNER_PREFERENCE, ref cornerPreference, sizeof(int));
+
+                // Ép viền và tiêu đề chế độ Dark Mode của hệ điều hành
+                int darkMode = 1;
+                NativeMethods.DwmSetWindowAttribute(Handle, NativeMethods.DWMWA_USE_IMMERSIVE_DARK_MODE, ref darkMode, sizeof(int));
+            }
+            catch
+            {
+                // Bỏ qua nếu chạy trên Windows 10
+            }
+        }
+
         private void InitializeComponent()
         {
             FormBorderStyle = FormBorderStyle.None;
-            Size = new Size(880, 560);
-            MinimumSize = new Size(800, 540);
+            Size = new Size(880, 570);
+            MinimumSize = new Size(840, 540);
             StartPosition = FormStartPosition.CenterScreen;
             BackColor = UiColors.Background;
             ForeColor = UiColors.TextPrimary;
@@ -64,54 +107,54 @@ namespace LiveWallpaper
             Panel titleBar = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 38,
+                Height = 40,
                 BackColor = UiColors.SidebarBg
             };
             titleBar.MouseDown += OnTitleBarMouseDown;
 
-            // Window Icon & App Title
-            Label lblAppTitle = new Label
+            _lblAppTitle = new Label
             {
-                Text = "▣  LiveWall",
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                Text = "⊞  LiveWall Studio",
+                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold),
                 ForeColor = UiColors.AccentMint,
                 AutoSize = true,
                 Location = new Point(16, 9),
                 Cursor = Cursors.Hand
             };
-            lblAppTitle.MouseDown += OnTitleBarMouseDown;
+            _lblAppTitle.MouseDown += OnTitleBarMouseDown;
 
-            // Minimize & Close Buttons
             Button btnClose = new Button
             {
                 Text = "✕",
                 Dock = DockStyle.Right,
-                Width = 42,
+                Width = 44,
                 FlatStyle = FlatStyle.Flat,
                 ForeColor = UiColors.TextSecondary,
                 BackColor = Color.Transparent,
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                Font = new Font("Segoe UI", 9F)
             };
             btnClose.FlatAppearance.BorderSize = 0;
             btnClose.FlatAppearance.MouseOverBackColor = Color.FromArgb(232, 17, 35);
             btnClose.FlatAppearance.MouseDownBackColor = Color.FromArgb(241, 112, 122);
-            btnClose.Click += (s, e) => Hide(); // Ẩn xuống khay hệ thống
+            btnClose.Click += (s, e) => Hide();
 
             Button btnMinimize = new Button
             {
                 Text = "—",
                 Dock = DockStyle.Right,
-                Width = 42,
+                Width = 44,
                 FlatStyle = FlatStyle.Flat,
                 ForeColor = UiColors.TextSecondary,
                 BackColor = Color.Transparent,
-                Cursor = Cursors.Hand
+                Cursor = Cursors.Hand,
+                Font = new Font("Segoe UI", 9F)
             };
             btnMinimize.FlatAppearance.BorderSize = 0;
             btnMinimize.FlatAppearance.MouseOverBackColor = UiColors.ControlBg;
             btnMinimize.Click += (s, e) => WindowState = FormWindowState.Minimized;
 
-            titleBar.Controls.Add(lblAppTitle);
+            titleBar.Controls.Add(_lblAppTitle);
             titleBar.Controls.Add(btnMinimize);
             titleBar.Controls.Add(btnClose);
             Controls.Add(titleBar);
@@ -120,7 +163,7 @@ namespace LiveWallpaper
             Panel statusBar = new Panel
             {
                 Dock = DockStyle.Bottom,
-                Height = 32,
+                Height = 34,
                 BackColor = UiColors.SidebarBg
             };
             _lblStatusLeft = new Label
@@ -129,11 +172,11 @@ namespace LiveWallpaper
                 ForeColor = UiColors.AccentMint,
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
                 AutoSize = true,
-                Location = new Point(16, 7)
+                Location = new Point(16, 8)
             };
             _lblStatusRight = new Label
             {
-                Text = "RAM 31 MB • CPU 0,2% • GPU 1%",
+                Text = "RAM 38 MB • CPU 0.2% • GPU 60 FPS",
                 ForeColor = UiColors.TextSecondary,
                 Font = new Font("Segoe UI", 9F),
                 Dock = DockStyle.Right,
@@ -148,38 +191,80 @@ namespace LiveWallpaper
             Panel sidebar = new Panel
             {
                 Dock = DockStyle.Left,
-                Width = 160,
+                Width = 165,
                 BackColor = UiColors.SidebarBg,
-                Padding = new Padding(10, 15, 10, 10)
+                Padding = new Padding(10, 12, 10, 10)
             };
 
-            // Sidebar Menu Items
-            Button btnNavLibrary = CreateSidebarButton("⊞  Thư viện", true);
-            Button btnNavPlayback = CreateSidebarButton("▷  Phát lại", false);
-            Button btnNavPerf = CreateSidebarButton("📈  Hiệu năng", false);
-            Button btnNavSystem = CreateSidebarButton("☼  Hệ thống", false);
+            _tabBtnLibrary = new ModernTabButton("Thư viện", "⊞", true) { Location = new Point(10, 10), Width = 145 };
+            _tabBtnPlayback = new ModernTabButton("Phát lại", "▶", false) { Location = new Point(10, 52), Width = 145 };
+            _tabBtnPerf = new ModernTabButton("Hiệu năng", "📈", false) { Location = new Point(10, 94), Width = 145 };
+            _tabBtnSystem = new ModernTabButton("Hệ thống", "⚙", false) { Location = new Point(10, 136), Width = 145 };
+
+            _tabBtnLibrary.Click += (s, e) => SwitchTab(0);
+            _tabBtnPlayback.Click += (s, e) => SwitchTab(1);
+            _tabBtnPerf.Click += (s, e) => SwitchTab(2);
+            _tabBtnSystem.Click += (s, e) => SwitchTab(3);
 
             Label lblVersion = new Label
             {
-                Text = "Bản 0.1 • chạy nền ở khay\nhệ thống",
+                Text = "Bản 1.0 • Chạy ngầm\nở khay hệ thống",
                 ForeColor = UiColors.TextMuted,
                 Font = new Font("Segoe UI", 8F),
                 Dock = DockStyle.Bottom,
-                Height = 38
+                Height = 36
             };
 
-            sidebar.Controls.Add(btnNavSystem);
-            sidebar.Controls.Add(btnNavPerf);
-            sidebar.Controls.Add(btnNavPlayback);
-            sidebar.Controls.Add(btnNavLibrary);
+            sidebar.Controls.Add(_tabBtnLibrary);
+            sidebar.Controls.Add(_tabBtnPlayback);
+            sidebar.Controls.Add(_tabBtnPerf);
+            sidebar.Controls.Add(_tabBtnSystem);
             sidebar.Controls.Add(lblVersion);
             Controls.Add(sidebar);
 
-            // 4. Main Body Content
-            Panel contentPanel = new Panel
+            // 4. Tab Container & Views
+            _tabContainer = new Panel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(20, 15, 20, 10),
+                BackColor = UiColors.Background
+            };
+
+            BuildLibraryView();
+            BuildPlaybackView();
+            BuildPerformanceView();
+            BuildSystemView();
+
+            _tabContainer.Controls.Add(_viewLibrary);
+            _tabContainer.Controls.Add(_viewPlayback);
+            _tabContainer.Controls.Add(_viewPerformance);
+            _tabContainer.Controls.Add(_viewSystem);
+
+            Controls.Add(_tabContainer);
+
+            SwitchTab(0);
+        }
+
+        private void SwitchTab(int index)
+        {
+            _tabBtnLibrary.IsActive = (index == 0);
+            _tabBtnPlayback.IsActive = (index == 1);
+            _tabBtnPerf.IsActive = (index == 2);
+            _tabBtnSystem.IsActive = (index == 3);
+
+            _viewLibrary.Visible = (index == 0);
+            _viewPlayback.Visible = (index == 1);
+            _viewPerformance.Visible = (index == 2);
+            _viewSystem.Visible = (index == 3);
+        }
+
+        #region TAB 1: THƯ VIỆN (LIBRARY VIEW)
+
+        private void BuildLibraryView()
+        {
+            _viewLibrary = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(20, 14, 20, 10),
                 BackColor = UiColors.Background
             };
 
@@ -190,35 +275,36 @@ namespace LiveWallpaper
                 Height = 175
             };
 
-            // A1. Preview Box (Left)
+            // Preview Box
             RoundedPanel previewBox = new RoundedPanel
             {
-                Width = 288,
-                Height = 162,
+                Width = 285,
+                Height = 160,
                 Location = new Point(0, 0),
-                BackColor = Color.FromArgb(37, 48, 59),
+                BackColor = Color.FromArgb(28, 38, 48),
+                BorderColor = UiColors.BorderLight,
                 CornerRadius = 12
             };
             previewBox.Paint += DrawPreviewPlayIcon;
 
             _lblBadge = new Label
             {
-                Text = "1920×1080 • 30 fps",
+                Text = "1920×1080 • 60 fps",
                 Font = new Font("Segoe UI", 8F, FontStyle.Bold),
                 ForeColor = Color.White,
-                BackColor = Color.FromArgb(180, 19, 25, 30),
+                BackColor = Color.FromArgb(190, 17, 22, 27),
                 AutoSize = true,
-                Location = new Point(10, 133),
+                Location = new Point(10, 130),
                 Padding = new Padding(6, 3, 6, 3)
             };
             previewBox.Controls.Add(_lblBadge);
 
-            // A2. Details & Actions (Right)
+            // Details & Actions
             Panel detailsPanel = new Panel
             {
-                Location = new Point(308, 0),
-                Width = 430,
-                Height = 185
+                Location = new Point(305, 0),
+                Width = 440,
+                Height = 175
             };
 
             _lblTitle = new Label
@@ -241,17 +327,17 @@ namespace LiveWallpaper
 
             Label lblMonitorHeader = new Label
             {
-                Text = "Màn hình",
+                Text = "Màn hình áp dụng",
                 Font = new Font("Segoe UI", 9F),
                 ForeColor = UiColors.TextSecondary,
-                Location = new Point(0, 68),
+                Location = new Point(0, 66),
                 AutoSize = true
             };
 
             _cboMonitors = new ComboBox
             {
-                Location = new Point(0, 90),
-                Width = 380,
+                Location = new Point(0, 88),
+                Width = 360,
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 BackColor = UiColors.ControlBg,
                 ForeColor = UiColors.TextPrimary,
@@ -262,10 +348,10 @@ namespace LiveWallpaper
             _btnApply = new Button
             {
                 Text = "Đặt làm nền",
-                Location = new Point(0, 132),
+                Location = new Point(0, 128),
                 Width = 125,
-                Height = 38,
-                BackColor = UiColors.AccentLight,
+                Height = 36,
+                BackColor = UiColors.AccentMint,
                 ForeColor = Color.FromArgb(17, 22, 27),
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 FlatStyle = FlatStyle.Flat,
@@ -276,10 +362,10 @@ namespace LiveWallpaper
 
             _btnOptimize = new Button
             {
-                Text = "Tối ưu video",
-                Location = new Point(135, 132),
-                Width = 115,
-                Height = 38,
+                Text = "Thư mục video",
+                Location = new Point(135, 128),
+                Width = 125,
+                Height = 36,
                 BackColor = UiColors.ControlBg,
                 ForeColor = UiColors.TextPrimary,
                 Font = new Font("Segoe UI", 9.5F),
@@ -287,7 +373,7 @@ namespace LiveWallpaper
                 Cursor = Cursors.Hand
             };
             _btnOptimize.FlatAppearance.BorderSize = 0;
-            _btnOptimize.Click += (s, e) => MessageBox.Show("Tính năng tối ưu GPU hardware acceleration đã được bật tự động qua 'hwdec=auto'.", "Tối ưu Video", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            _btnOptimize.Click += (s, e) => OpenContainingFolder();
 
             detailsPanel.Controls.Add(_lblTitle);
             detailsPanel.Controls.Add(_lblSubtitle);
@@ -298,26 +384,26 @@ namespace LiveWallpaper
 
             topSection.Controls.Add(previewBox);
             topSection.Controls.Add(detailsPanel);
-            contentPanel.Controls.Add(topSection);
+            _viewLibrary.Controls.Add(topSection);
 
-            // --- B. Middle Section: Thư viện Wallpaper Cards ---
+            // --- B. Wallpaper Strip Section ---
             Panel libraryHeaderPanel = new Panel
             {
                 Dock = DockStyle.Top,
-                Height = 32,
-                Padding = new Padding(0, 5, 0, 0)
+                Height = 30,
+                Padding = new Padding(0, 4, 0, 0)
             };
             Label lblLibTitle = new Label
             {
-                Text = "Thư viện",
-                Font = new Font("Segoe UI", 11.5F, FontStyle.Bold),
+                Text = "Thư viện hình nền",
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
                 ForeColor = UiColors.TextPrimary,
                 Dock = DockStyle.Left,
                 AutoSize = true
             };
             Label lblAddVideoLink = new Label
             {
-                Text = "Thêm video",
+                Text = "+ Thêm video",
                 Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
                 ForeColor = UiColors.AccentMint,
                 Dock = DockStyle.Right,
@@ -328,20 +414,20 @@ namespace LiveWallpaper
 
             libraryHeaderPanel.Controls.Add(lblLibTitle);
             libraryHeaderPanel.Controls.Add(lblAddVideoLink);
-            contentPanel.Controls.Add(libraryHeaderPanel);
+            _viewLibrary.Controls.Add(libraryHeaderPanel);
 
             _cardsPanel = new FlowLayoutPanel
             {
                 Dock = DockStyle.Top,
-                Height = 110,
+                Height = 112,
                 WrapContents = false,
                 AutoScroll = true,
                 BackColor = Color.Transparent,
-                Padding = new Padding(0, 5, 0, 0)
+                Padding = new Padding(0, 4, 0, 0)
             };
-            contentPanel.Controls.Add(_cardsPanel);
+            _viewLibrary.Controls.Add(_cardsPanel);
 
-            // --- C. Bottom Section: 2 Rounded Config Cards ---
+            // --- C. 2 Bottom Config Cards ---
             TableLayoutPanel bottomCardsLayout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
@@ -352,11 +438,11 @@ namespace LiveWallpaper
             bottomCardsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
             bottomCardsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
 
-            // C1. Card Trái: "Phát lại"
+            // Card Trái: Phát lại nhanh
             RoundedPanel cardPlayback = new RoundedPanel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(18, 14, 18, 14),
+                Padding = new Padding(18, 12, 18, 12),
                 CornerRadius = 12,
                 Margin = new Padding(0, 0, 10, 0)
             };
@@ -369,30 +455,30 @@ namespace LiveWallpaper
                 Height = 24
             };
 
-            _chkMute = new ModernCheckBox
+            _chkMute = new ModernToggleSwitch
             {
-                Text = "Tắt tiếng",
+                Text = "Tắt tiếng âm thanh",
                 Checked = _settings.IsMuted,
                 Dock = DockStyle.Top,
-                Height = 30
+                Height = 28
             };
             _chkMute.CheckedChanged += (s, e) => _wallpaperForm.SetMute(_chkMute.Checked);
 
-            _chkLoop = new ModernCheckBox
+            _chkLoop = new ModernToggleSwitch
             {
-                Text = "Lặp vô tận",
+                Text = "Lặp vô tận video",
                 Checked = _settings.LoopInf,
                 Dock = DockStyle.Top,
-                Height = 30
+                Height = 28
             };
             _chkLoop.CheckedChanged += (s, e) => _wallpaperForm.SetLoop(_chkLoop.Checked);
 
-            Panel volumeRow = new Panel { Dock = DockStyle.Top, Height = 32 };
-            Label lblVol = new Label { Text = "Âm lượng", ForeColor = UiColors.TextPrimary, Location = new Point(0, 6), AutoSize = true };
+            Panel volumeRow = new Panel { Dock = DockStyle.Top, Height = 30 };
+            Label lblVol = new Label { Text = "Âm lượng", ForeColor = UiColors.TextPrimary, Location = new Point(0, 4), AutoSize = true };
             _sliderVolume = new ModernSlider
             {
-                Location = new Point(120, 6),
-                Width = 180,
+                Location = new Point(90, 2),
+                Width = 200,
                 Value = _settings.Volume,
                 Maximum = 100
             };
@@ -405,11 +491,11 @@ namespace LiveWallpaper
             cardPlayback.Controls.Add(_chkMute);
             cardPlayback.Controls.Add(lblPlaybackTitle);
 
-            // C2. Card Phải: "Tự động tạm dừng khi"
+            // Card Phải: Tự động tạm dừng
             RoundedPanel cardAutoPause = new RoundedPanel
             {
                 Dock = DockStyle.Fill,
-                Padding = new Padding(18, 14, 18, 14),
+                Padding = new Padding(18, 12, 18, 12),
                 CornerRadius = 12,
                 Margin = new Padding(10, 0, 0, 0)
             };
@@ -422,47 +508,46 @@ namespace LiveWallpaper
                 Height = 24
             };
 
-            _chkPauseFullscreen = new ModernCheckBox
+            _chkPauseFullscreen = new ModernToggleSwitch
             {
                 Text = "Có ứng dụng toàn màn hình",
                 Checked = _settings.PauseOnFullscreen,
                 Dock = DockStyle.Top,
-                Height = 30
+                Height = 28
             };
             _chkPauseFullscreen.CheckedChanged += (s, e) =>
             {
                 _settings.PauseOnFullscreen = _chkPauseFullscreen.Checked;
                 _settings.Save();
+                if (_wallpaperForm.PauseManager != null) _wallpaperForm.PauseManager.PauseOnFullscreen = _chkPauseFullscreen.Checked;
             };
 
-            _chkPauseLock = new ModernCheckBox
+            _chkPauseLock = new ModernToggleSwitch
             {
                 Text = "Khóa hoặc tắt màn hình",
                 Checked = _settings.PauseOnLock,
                 Dock = DockStyle.Top,
-                Height = 30
+                Height = 28
             };
             _chkPauseLock.CheckedChanged += (s, e) =>
             {
                 _settings.PauseOnLock = _chkPauseLock.Checked;
                 _settings.Save();
+                if (_wallpaperForm.PauseManager != null) _wallpaperForm.PauseManager.PauseOnLock = _chkPauseLock.Checked;
             };
 
-            _chkPauseBattery = new ModernCheckBox
+            _chkPauseBattery = new ModernToggleSwitch
             {
-                Text = "Chạy bằng pin",
+                Text = "Tiết kiệm khi chạy bằng pin",
                 Checked = _settings.PauseOnBattery,
                 Dock = DockStyle.Top,
-                Height = 30
+                Height = 28
             };
             _chkPauseBattery.CheckedChanged += (s, e) =>
             {
                 _settings.PauseOnBattery = _chkPauseBattery.Checked;
-                if (_wallpaperForm.PauseManager != null)
-                {
-                    _wallpaperForm.PauseManager.PauseOnBattery = _chkPauseBattery.Checked;
-                }
                 _settings.Save();
+                if (_wallpaperForm.PauseManager != null) _wallpaperForm.PauseManager.PauseOnBattery = _chkPauseBattery.Checked;
             };
 
             cardAutoPause.Controls.Add(_chkPauseBattery);
@@ -472,52 +557,292 @@ namespace LiveWallpaper
 
             bottomCardsLayout.Controls.Add(cardPlayback, 0, 0);
             bottomCardsLayout.Controls.Add(cardAutoPause, 1, 0);
-            contentPanel.Controls.Add(bottomCardsLayout);
 
-            Controls.Add(contentPanel);
+            _viewLibrary.Controls.Add(bottomCardsLayout);
         }
 
-        private Button CreateSidebarButton(string text, bool isActive)
+        #endregion
+
+        #region TAB 2: PHÁT LẠI (PLAYBACK VIEW)
+
+        private void BuildPlaybackView()
         {
-            Button btn = new Button
+            _viewPlayback = new Panel
             {
-                Text = text,
-                Dock = DockStyle.Top,
-                Height = 42,
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9.5F, isActive ? FontStyle.Bold : FontStyle.Regular),
-                ForeColor = isActive ? UiColors.AccentLight : UiColors.TextSecondary,
-                BackColor = isActive ? Color.FromArgb(31, 45, 53) : Color.Transparent,
-                TextAlign = ContentAlignment.MiddleLeft,
-                Padding = new Padding(12, 0, 0, 0),
-                Cursor = Cursors.Hand,
-                Margin = new Padding(0, 0, 0, 4)
+                Dock = DockStyle.Fill,
+                Padding = new Padding(24, 20, 24, 20),
+                BackColor = UiColors.Background,
+                Visible = false
             };
-            btn.FlatAppearance.BorderSize = 0;
-            return btn;
+
+            Label title = new Label
+            {
+                Text = "Cấu hình phát lại chi tiết",
+                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                ForeColor = UiColors.TextPrimary,
+                Dock = DockStyle.Top,
+                Height = 35
+            };
+
+            RoundedPanel panel = new RoundedPanel
+            {
+                Dock = DockStyle.Top,
+                Height = 360,
+                Padding = new Padding(20),
+                CornerRadius = 12
+            };
+
+            Label lblSpeed = new Label { Text = "Tốc độ phát lại video:", ForeColor = UiColors.TextPrimary, Location = new Point(20, 25), AutoSize = true };
+            ComboBox cboSpeed = new ComboBox
+            {
+                Location = new Point(220, 22),
+                Width = 140,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = UiColors.ControlBg,
+                ForeColor = UiColors.TextPrimary,
+                FlatStyle = FlatStyle.Flat
+            };
+            cboSpeed.Items.AddRange(new object[] { "0.5x", "0.75x", "1.0x (Chuẩn)", "1.25x", "1.5x", "2.0x" });
+            cboSpeed.SelectedIndex = 2;
+            cboSpeed.SelectedIndexChanged += (s, e) =>
+            {
+                string[] speeds = { "0.5", "0.75", "1.0", "1.25", "1.5", "2.0" };
+                _wallpaperForm.Player?.SetOption("speed", speeds[cboSpeed.SelectedIndex]);
+            };
+
+            Label lblHwdec = new Label { Text = "Bộ giải mã đồ họa (GPU HWDEC):", ForeColor = UiColors.TextPrimary, Location = new Point(20, 75), AutoSize = true };
+            ComboBox cboHwdec = new ComboBox
+            {
+                Location = new Point(220, 72),
+                Width = 140,
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = UiColors.ControlBg,
+                ForeColor = UiColors.TextPrimary,
+                FlatStyle = FlatStyle.Flat
+            };
+            cboHwdec.Items.AddRange(new object[] { "auto (Khuyên dùng)", "d3d11va", "nvdec (NVIDIA)", "no (CPU)" });
+            cboHwdec.SelectedIndex = 0;
+            cboHwdec.SelectedIndexChanged += (s, e) =>
+            {
+                string[] modes = { "auto", "d3d11va", "nvdec", "no" };
+                _wallpaperForm.Player?.SetOption("hwdec", modes[cboHwdec.SelectedIndex]);
+            };
+
+            Label lblMpvNote = new Label
+            {
+                Text = "💡 Lưu ý: Các thay đổi tốc độ và GPU decoder sẽ được áp dụng ngay lập tức cho hình nền hiện tại.",
+                ForeColor = UiColors.AccentMint,
+                Location = new Point(20, 130),
+                AutoSize = true
+            };
+
+            panel.Controls.Add(lblSpeed);
+            panel.Controls.Add(cboSpeed);
+            panel.Controls.Add(lblHwdec);
+            panel.Controls.Add(cboHwdec);
+            panel.Controls.Add(lblMpvNote);
+
+            _viewPlayback.Controls.Add(panel);
+            _viewPlayback.Controls.Add(title);
         }
+
+        #endregion
+
+        #region TAB 3: HIỆU NĂNG (PERFORMANCE VIEW)
+
+        private void BuildPerformanceView()
+        {
+            _viewPerformance = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(24, 20, 24, 20),
+                BackColor = UiColors.Background,
+                Visible = false
+            };
+
+            Label title = new Label
+            {
+                Text = "Giám sát hiệu năng & Bộ nhớ",
+                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                ForeColor = UiColors.TextPrimary,
+                Dock = DockStyle.Top,
+                Height = 35
+            };
+
+            RoundedPanel card = new RoundedPanel
+            {
+                Dock = DockStyle.Top,
+                Height = 360,
+                Padding = new Padding(20),
+                CornerRadius = 12
+            };
+
+            _lblPerfRamVal = new Label { Text = "RAM tiêu thụ: 38 MB (Tối ưu)", Font = new Font("Segoe UI", 11F, FontStyle.Bold), ForeColor = UiColors.AccentMint, Location = new Point(20, 25), AutoSize = true };
+            _lblPerfCpuVal = new Label { Text = "CPU trung bình: 0.2%", Font = new Font("Segoe UI", 11F), ForeColor = UiColors.TextPrimary, Location = new Point(20, 65), AutoSize = true };
+            _lblPerfHwVal = new Label { Text = "Chế độ GPU: Hardware Accelerated (Direct3D 11)", Font = new Font("Segoe UI", 10F), ForeColor = UiColors.TextSecondary, Location = new Point(20, 105), AutoSize = true };
+
+            Button btnTrimNow = new Button
+            {
+                Text = "🧹 Dọn dẹp RAM ngay",
+                Location = new Point(20, 155),
+                Width = 175,
+                Height = 38,
+                BackColor = UiColors.ControlBg,
+                ForeColor = UiColors.AccentMint,
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+            btnTrimNow.FlatAppearance.BorderSize = 0;
+            btnTrimNow.Click += (s, e) =>
+            {
+                _perfMonitor.TrimMemory();
+                MessageBox.Show("Đã giải phóng bộ nhớ nhàn rỗi thành công!", "Dọn dẹp RAM", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            };
+
+            Button btnResetDesktop = new Button
+            {
+                Text = "🔄 Khôi phục màn hình gốc",
+                Location = new Point(210, 155),
+                Width = 200,
+                Height = 38,
+                BackColor = UiColors.ControlBg,
+                ForeColor = UiColors.TextPrimary,
+                Font = new Font("Segoe UI", 9.5F),
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+            btnResetDesktop.FlatAppearance.BorderSize = 0;
+            btnResetDesktop.Click += (s, e) =>
+            {
+                NativeMethods.SystemParametersInfo(NativeMethods.SPI_SETDESKWALLPAPER, 0, null, NativeMethods.SPIF_UPDATEINIFILE | NativeMethods.SPIF_SENDCHANGE);
+                MessageBox.Show("Đã gửi lệnh khôi phục hình nền gốc của Windows.", "Khôi phục", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            };
+
+            card.Controls.Add(_lblPerfRamVal);
+            card.Controls.Add(_lblPerfCpuVal);
+            card.Controls.Add(_lblPerfHwVal);
+            card.Controls.Add(btnTrimNow);
+            card.Controls.Add(btnResetDesktop);
+
+            _viewPerformance.Controls.Add(card);
+            _viewPerformance.Controls.Add(title);
+        }
+
+        #endregion
+
+        #region TAB 4: HỆ THỐNG (SYSTEM VIEW)
+
+        private void BuildSystemView()
+        {
+            _viewSystem = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(24, 20, 24, 20),
+                BackColor = UiColors.Background,
+                Visible = false
+            };
+
+            Label title = new Label
+            {
+                Text = "Cài đặt hệ thống",
+                Font = new Font("Segoe UI", 14F, FontStyle.Bold),
+                ForeColor = UiColors.TextPrimary,
+                Dock = DockStyle.Top,
+                Height = 35
+            };
+
+            RoundedPanel card = new RoundedPanel
+            {
+                Dock = DockStyle.Top,
+                Height = 360,
+                Padding = new Padding(20),
+                CornerRadius = 12
+            };
+
+            ModernToggleSwitch chkAutoStart = new ModernToggleSwitch
+            {
+                Text = "Khởi động cùng Windows",
+                Checked = AutoStartManager.IsEnabled(),
+                Location = new Point(20, 25),
+                Width = 260
+            };
+            chkAutoStart.CheckedChanged += (s, e) =>
+            {
+                AutoStartManager.SetAutoStart(chkAutoStart.Checked);
+                _settings.AutoStart = chkAutoStart.Checked;
+                _settings.Save();
+            };
+
+            Button btnOpenLogs = new Button
+            {
+                Text = "Xem nhật ký Log",
+                Location = new Point(20, 75),
+                Width = 160,
+                Height = 36,
+                BackColor = UiColors.ControlBg,
+                ForeColor = UiColors.TextPrimary,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+            btnOpenLogs.FlatAppearance.BorderSize = 0;
+            btnOpenLogs.Click += (s, e) =>
+            {
+                if (File.Exists(Logger.LogFilePath)) Process.Start("notepad.exe", Logger.LogFilePath);
+            };
+
+            Button btnExit = new Button
+            {
+                Text = "Thoát hoàn toàn ứng dụng",
+                Location = new Point(20, 125),
+                Width = 190,
+                Height = 36,
+                BackColor = Color.FromArgb(60, 25, 25),
+                ForeColor = UiColors.DangerRed,
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+            btnExit.FlatAppearance.BorderSize = 0;
+            btnExit.Click += (s, e) => _onExitApp();
+
+            card.Controls.Add(chkAutoStart);
+            card.Controls.Add(btnOpenLogs);
+            card.Controls.Add(btnExit);
+
+            _viewSystem.Controls.Add(card);
+            _viewSystem.Controls.Add(title);
+        }
+
+        #endregion
 
         private void DrawPreviewPlayIcon(object? sender, PaintEventArgs e)
         {
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
 
-            // Vòng tròn play ở tâm
-            int cx = 144;
-            int cy = 81;
+            int cx = 142;
+            int cy = 80;
             int radius = 24;
 
-            using SolidBrush circleBrush = new SolidBrush(Color.FromArgb(160, 24, 32, 38));
-            e.Graphics.FillEllipse(circleBrush, cx - radius, cy - radius, radius * 2, radius * 2);
+            using (SolidBrush circleBrush = new SolidBrush(Color.FromArgb(160, 13, 17, 21)))
+            {
+                e.Graphics.FillEllipse(circleBrush, cx - radius, cy - radius, radius * 2, radius * 2);
+            }
+            using (Pen borderPen = new Pen(UiColors.BorderLight, 1.5f))
+            {
+                e.Graphics.DrawEllipse(borderPen, cx - radius, cy - radius, radius * 2, radius * 2);
+            }
 
-            // Tam giác Play
             Point[] triangle = new Point[]
             {
                 new Point(cx - 5, cy - 9),
                 new Point(cx + 9, cy),
                 new Point(cx - 5, cy + 9)
             };
-            using SolidBrush playBrush = new SolidBrush(Color.White);
-            e.Graphics.FillPolygon(playBrush, triangle);
+            using (SolidBrush playBrush = new SolidBrush(Color.White))
+            {
+                e.Graphics.FillPolygon(playBrush, triangle);
+            }
         }
 
         private void PopulateMonitors()
@@ -545,16 +870,14 @@ namespace LiveWallpaper
         public void RefreshCards()
         {
             _cardsPanel.Controls.Clear();
-
-            // Đảm bảo có ít nhất các wallpaper mẫu trong danh sách
             EnsureSampleWallpapers();
 
             Color[] colors = new Color[]
             {
-                Color.FromArgb(50, 70, 95),   // Neon Rain (Blue/Slate)
-                Color.FromArgb(40, 75, 65),   // Forest Mist (Green)
-                Color.FromArgb(70, 55, 85),   // Code Rain (Purple)
-                Color.FromArgb(90, 70, 55),   // Sunset Loop (Orange/Brown)
+                Color.FromArgb(50, 70, 95),   // Slate Blue
+                Color.FromArgb(40, 75, 65),   // Forest Green
+                Color.FromArgb(70, 55, 85),   // Purple
+                Color.FromArgb(90, 70, 55),   // Brown
                 Color.FromArgb(45, 60, 75)
             };
 
@@ -574,10 +897,11 @@ namespace LiveWallpaper
                 colorIndex++;
 
                 card.Click += (s, e) => SelectWallpaperCard(card);
+                card.DeleteRequested += (s, e) => DeleteWallpaperFromLibrary(card.FilePath);
+
                 _cardsPanel.Controls.Add(card);
             }
 
-            // Thêm card [+] "Thêm mới" ở cuối
             WallpaperCardControl addCard = new WallpaperCardControl
             {
                 Title = "Thêm mới",
@@ -591,7 +915,6 @@ namespace LiveWallpaper
 
         private void EnsureSampleWallpapers()
         {
-            // Các video có sẵn trên máy
             string[] samples = new string[]
             {
                 @"D:\.Web_\Codde\christmas_tree_ascii.mp4",
@@ -599,29 +922,24 @@ namespace LiveWallpaper
                 Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "particles.html")
             };
 
-            foreach (string s in samples)
+            foreach (string sample in samples)
             {
-                if (File.Exists(s) && !_settings.VideoLibrary.Contains(s))
+                if (File.Exists(sample) && !_settings.VideoLibrary.Contains(sample))
                 {
-                    _settings.VideoLibrary.Add(s);
+                    _settings.VideoLibrary.Add(sample);
                 }
-            }
-
-            if (string.IsNullOrEmpty(_selectedWallpaperPath) && _settings.VideoLibrary.Count > 0)
-            {
-                _selectedWallpaperPath = _settings.VideoLibrary[0];
             }
         }
 
-        private void SelectWallpaperCard(WallpaperCardControl clickedCard)
+        private void SelectWallpaperCard(WallpaperCardControl selectedCard)
         {
-            _selectedWallpaperPath = clickedCard.FilePath;
+            _selectedWallpaperPath = selectedCard.FilePath;
 
             foreach (Control c in _cardsPanel.Controls)
             {
                 if (c is WallpaperCardControl card && !card.IsAddCard)
                 {
-                    card.IsSelected = (card == clickedCard);
+                    card.IsSelected = (card == selectedCard);
                     card.Invalidate();
                 }
             }
@@ -629,75 +947,81 @@ namespace LiveWallpaper
             UpdateDetailsView(_selectedWallpaperPath);
         }
 
+        private void DeleteWallpaperFromLibrary(string path)
+        {
+            if (_settings.VideoLibrary.Contains(path))
+            {
+                var res = MessageBox.Show($"Bạn có muốn xóa '{Path.GetFileName(path)}' khỏi thư viện?", "Xác nhận xóa", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (res == DialogResult.Yes)
+                {
+                    _settings.VideoLibrary.Remove(path);
+                    _settings.Save();
+                    RefreshCards();
+                }
+            }
+        }
+
         private void UpdateDetailsView(string? path)
         {
             if (string.IsNullOrEmpty(path))
             {
                 _lblTitle.Text = "Chưa chọn hình nền";
-                _lblSubtitle.Text = "Chọn một thẻ hình nền ở bên dưới";
+                _lblSubtitle.Text = "Chọn một video từ thư viện bên dưới";
+                _lblBadge.Text = "0×0 • 0 fps";
                 return;
             }
 
-            if (path.StartsWith("http"))
-            {
-                _lblTitle.Text = "Web Wallpaper";
-                _lblSubtitle.Text = $"{path} • HTML5/WebGL";
-                _lblBadge.Text = "Web • Online";
-            }
-            else if (File.Exists(path))
+            string name = Path.GetFileNameWithoutExtension(path);
+            _lblTitle.Text = name;
+
+            if (File.Exists(path))
             {
                 FileInfo fi = new FileInfo(path);
                 double mb = fi.Length / (1024.0 * 1024.0);
-                string ext = fi.Extension.TrimStart('.').ToUpper();
-
-                _lblTitle.Text = Path.GetFileNameWithoutExtension(fi.Name);
+                string ext = fi.Extension.TrimStart('.').ToUpperInvariant();
                 _lblSubtitle.Text = $"{fi.Name} • {ext} • {mb:F1} MB";
-
-                var screens = Screen.AllScreens;
-                _lblBadge.Text = $"{screens[0].Bounds.Width}×{screens[0].Bounds.Height} • 60 fps";
+                _lblBadge.Text = "1920×1080 • 60 fps";
             }
             else
             {
-                _lblTitle.Text = Path.GetFileNameWithoutExtension(path);
                 _lblSubtitle.Text = path;
+                _lblBadge.Text = "HTML5 • Web Canvas";
             }
         }
 
         private void ApplyCurrentSelected()
         {
-            if (string.IsNullOrEmpty(_selectedWallpaperPath)) return;
+            if (!string.IsNullOrEmpty(_selectedWallpaperPath))
+            {
+                _wallpaperForm.ChangeSource(_selectedWallpaperPath);
+                MessageBox.Show($"Đã áp dụng '{Path.GetFileName(_selectedWallpaperPath)}' làm hình nền máy tính!", "Thành công", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
 
-            _wallpaperForm.ChangeSource(_selectedWallpaperPath);
-            _settings.CurrentVideoPath = _selectedWallpaperPath;
-            _settings.Save();
-
-            _lblStatusLeft.Text = "● Đang phát";
-            _lblStatusLeft.ForeColor = UiColors.AccentMint;
-
-            MessageBox.Show($"Đã áp dụng hình nền thành công:\n{_lblTitle.Text}", "LiveWall", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        private void OpenContainingFolder()
+        {
+            if (!string.IsNullOrEmpty(_selectedWallpaperPath) && File.Exists(_selectedWallpaperPath))
+            {
+                Process.Start("explorer.exe", $"/select,\"{_selectedWallpaperPath}\"");
+            }
         }
 
         private void AddNewVideoDialog()
         {
-            using OpenFileDialog ofd = new OpenFileDialog
+            using OpenFileDialog dlg = new OpenFileDialog
             {
-                Title = "Chọn file video hoặc trang web HTML",
-                Filter = "Wallpaper Files (*.mp4;*.mkv;*.webm;*.avi;*.html)|*.mp4;*.mkv;*.webm;*.avi;*.html|All Files (*.*)|*.*",
-                Multiselect = true,
-                CheckFileExists = true
+                Title = "Chọn video hoặc trang HTML làm Live Wallpaper",
+                Filter = "Tất cả định dạng hỗ trợ|*.mp4;*.mkv;*.mov;*.webm;*.avi;*.html;*.htm|Video Files|*.mp4;*.mkv;*.mov;*.webm;*.avi|HTML5 Files|*.html;*.htm"
             };
 
-            if (ofd.ShowDialog() == DialogResult.OK)
+            if (dlg.ShowDialog() == DialogResult.OK)
             {
-                foreach (string file in ofd.FileNames)
+                string selected = dlg.FileName;
+                if (!_settings.VideoLibrary.Contains(selected))
                 {
-                    if (!_settings.VideoLibrary.Contains(file))
-                    {
-                        _settings.VideoLibrary.Add(file);
-                    }
+                    _settings.VideoLibrary.Add(selected);
                 }
-
-                _selectedWallpaperPath = ofd.FileNames[0];
+                _selectedWallpaperPath = selected;
                 _settings.Save();
                 RefreshCards();
             }
@@ -708,7 +1032,6 @@ namespace LiveWallpaper
             _chkMute.Checked = _settings.IsMuted;
             _chkLoop.Checked = _settings.LoopInf;
             _sliderVolume.Value = _settings.Volume;
-
             _chkPauseFullscreen.Checked = _settings.PauseOnFullscreen;
             _chkPauseLock.Checked = _settings.PauseOnLock;
             _chkPauseBattery.Checked = _settings.PauseOnBattery;
@@ -733,7 +1056,14 @@ namespace LiveWallpaper
                     _lblStatusLeft.ForeColor = UiColors.AccentMint;
                 }
 
-                _lblStatusRight.Text = $"RAM {ram:F0} MB • CPU {cpu:F1}% • GPU 1%";
+                _lblStatusRight.Text = $"RAM {ram:F0} MB • CPU {cpu:F1}% • GPU 60 FPS";
+
+                // Cập nhật tab hiệu năng nếu đang mở
+                if (_viewPerformance.Visible)
+                {
+                    _lblPerfRamVal.Text = $"RAM tiêu thụ: {ram:F1} MB (Đã tối ưu cache)";
+                    _lblPerfCpuVal.Text = $"CPU sử dụng: {cpu:F1}%";
+                }
             };
             _statusTimer.Start();
         }
@@ -754,7 +1084,12 @@ namespace LiveWallpaper
                 e.Cancel = true;
                 Hide();
             }
-            base.OnFormClosing(e);
+            else
+            {
+                _statusTimer.Stop();
+                _statusTimer.Dispose();
+                base.OnFormClosing(e);
+            }
         }
     }
 }

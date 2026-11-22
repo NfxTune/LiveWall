@@ -209,6 +209,13 @@ namespace LiveWallpaper
 
         private static Icon CreateAppIcon()
         {
+            string appIco = Path.Combine(AppContext.BaseDirectory, "app.ico");
+            if (!File.Exists(appIco)) appIco = Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico");
+            if (File.Exists(appIco))
+            {
+                try { return new Icon(appIco); } catch { }
+            }
+
             using (Icon? executableIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath))
             {
                 if (executableIcon != null) return (Icon)executableIcon.Clone();

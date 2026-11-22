@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -36,15 +36,18 @@ namespace LiveWallpaper
             _singleInstanceMutex = new Mutex(true, mutexName, out bool isOnlyInstance);
             if (!isOnlyInstance)
             {
+                // Phát tín hiệu kích hoạt đến tiến trình đang chạy
+                uint msgActivate = NativeMethods.RegisterWindowMessage("LiveWall_ActivateMainWindow");
+                if (msgActivate != 0)
+                {
+                    NativeMethods.PostMessage((IntPtr)0xFFFF, msgActivate, IntPtr.Zero, IntPtr.Zero);
+                }
+
                 IntPtr existingWindow = FindWindow(null, "LiveWall");
                 if (existingWindow != IntPtr.Zero)
                 {
                     ShowWindow(existingWindow, 9 /* SW_RESTORE */);
                     SetForegroundWindow(existingWindow);
-                }
-                else
-                {
-                    MessageBox.Show("LiveWall is already running in the system tray. Open it from the tray icon.", "LiveWall", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 return;
             }

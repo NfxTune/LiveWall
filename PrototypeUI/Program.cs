@@ -1,4 +1,4 @@
-using LiveWall.UI;
+﻿using LiveWall.UI;
 
 ApplicationConfiguration.Initialize();
 

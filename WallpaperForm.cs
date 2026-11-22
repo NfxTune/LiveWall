@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
@@ -13,6 +13,7 @@ namespace LiveWallpaper
         private PauseManager? _pauseManager;
         private WebWallpaperManager? _webManager;
         private string? _currentSource;
+        private readonly uint _taskbarCreatedMsg;
 
         public MpvPlayer? Player => _player;
         public PauseManager? PauseManager => _pauseManager;
@@ -26,6 +27,7 @@ namespace LiveWallpaper
             _settings = settings;
             _currentSource = settings.CurrentVideoPath;
             _webManager = new WebWallpaperManager();
+            _taskbarCreatedMsg = NativeMethods.RegisterWindowMessage("TaskbarCreated");
 
             FormBorderStyle = FormBorderStyle.None;
             ShowInTaskbar = false;
@@ -164,6 +166,29 @@ namespace LiveWallpaper
             _settings.Volume = volume;
             _settings.Save();
             _player?.SetVolume(volume);
+        }
+
+        protected override void WndProc(ref Message m)
+        {
+            if (_taskbarCreatedMsg != 0 && m.Msg == (int)_taskbarCreatedMsg)
+            {
+                Logger.Info("[Self-Healing] Received TaskbarCreated broadcast (Explorer restarted). Re-attaching WallpaperForm...");
+                try
+                {
+                    if (_desktopManager.InitializeWorkerW())
+                    {
+                        _desktopManager.AttachWindow(Handle, Bounds);
+                        NativeMethods.ShowWindow(Handle, NativeMethods.SW_SHOW);
+                        NativeMethods.UpdateWindow(Handle);
+                        Logger.Info("[Self-Healing] Re-attached successfully after Explorer restart.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error("Failed to re-attach wallpaper after Explorer restart", ex);
+                }
+            }
+            base.WndProc(ref m);
         }
 
         protected override void OnFormClosing(FormClosingEventArgs e)

@@ -3,16 +3,17 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using System.Drawing;
+using System.Drawing.Imaging;
 
 namespace LiveWall.UI;
 
-/// <summary>Gọi ffmpeg/ffprobe: thumbnail, đọc thông tin video, tối ưu video.
-/// Tìm trong thư mục tools\ cạnh exe trước, rồi tới PATH.</summary>
+/// <summary>Gá» i Windows Shell thumbnail hoáº·c ffmpeg/ffprobe: thumbnail, Ä‘á» c thÃ´ng tin video, tá»‘i Æ°u video.</summary>
 static class Tools
 {
     public sealed record MediaInfo(string Codec, int Width, int Height, double Fps)
     {
-        public override string ToString() => $"{Width}×{Height} · {Fps:0.#} fps";
+        public override string ToString() => $"{Width}Ã—{Height} Â· {Fps:0.#} fps";
     }
 
     static string ThumbDir => Path.Combine(AppSettings.DataDir, "thumbs");
@@ -29,7 +30,7 @@ static class Tools
         return File.Exists(local) ? local : name;
     }
 
-    // null = không chạy được (thiếu file exe)
+    // null = khÃ´ng cháº¡y Ä‘Æ°á»£c (thiáº¿u file exe)
     static async Task<(int Code, string Out)?> RunAsync(string exe, params string[] args)
     {
         try
@@ -46,7 +47,7 @@ static class Tools
             using var p = Process.Start(psi);
             if (p == null) return null;
             var stdout = p.StandardOutput.ReadToEndAsync();
-            var stderr = p.StandardError.ReadToEndAsync(); // phải đọc để không bị treo đường ống
+            var stderr = p.StandardError.ReadToEndAsync();
             await p.WaitForExitAsync();
             await stderr;
             return (p.ExitCode, await stdout);
@@ -84,29 +85,64 @@ static class Tools
         var thumb = ThumbPath(video);
         if (File.Exists(thumb)) return;
         Directory.CreateDirectory(ThumbDir);
-        foreach (var seek in new[] { "1", "0" }) // video quá ngắn thì lấy khung đầu
+
+        // 1. Thá»­ trÃ­ch xuáº¥t thumbnail báº±ng Windows Shell Native (nhanh, sÃ¡ng rÃµ, khÃ´ng cáº§n ffmpeg)
+        try
+        {
+            using var shellBmp = LiveWallpaper.NativeMethods.GetShellThumbnail(video, 480, 270);
+            if (shellBmp != null)
+            {
+                shellBmp.Save(thumb, ImageFormat.Jpeg);
+                if (File.Exists(thumb)) return;
+            }
+        }
+        catch { }
+
+        // 2. Dá»± phÃ²ng báº±ng ffmpeg
+        foreach (var seek in new[] { "1", "0" })
         {
             await RunAsync(Exe("ffmpeg"), "-nostdin", "-loglevel", "error", "-y",
-                "-ss", seek, "-i", video, "-frames:v", "1", "-vf", "scale=320:-2", thumb);
+                "-ss", seek, "-i", video, "-frames:v", "1", "-vf", "scale=480:-2", thumb);
             if (File.Exists(thumb)) return;
         }
     }
 
-    /// <summary>Đọc thumbnail thành Bitmap mới (không khóa file). Trả null nếu chưa có.</summary>
+    /// <summary>Ä á» c thumbnail thÃ nh Bitmap má»›i. Tráº£ null náº¿u chÆ°a cÃ³.</summary>
     public static Bitmap? LoadThumb(string video)
     {
         var thumb = ThumbPath(video);
-        if (!File.Exists(thumb)) return null;
+        if (File.Exists(thumb))
+        {
+            try
+            {
+                using var fs = new FileStream(thumb, FileMode.Open, FileAccess.Read, FileShare.Read);
+                using var img = Image.FromStream(fs);
+                return new Bitmap(img);
+            }
+            catch { }
+        }
+
+        // Náº¿u chÆ°a cÃ³ file trÃªn disk, láº¥y trá»±c tiáº¿p tá»« Windows Shell
         try
         {
-            using var fs = new FileStream(thumb, FileMode.Open, FileAccess.Read, FileShare.Read);
-            using var img = Image.FromStream(fs);
-            return new Bitmap(img);
+            var shellBmp = LiveWallpaper.NativeMethods.GetShellThumbnail(video, 480, 270);
+            if (shellBmp != null)
+            {
+                try
+                {
+                    Directory.CreateDirectory(ThumbDir);
+                    shellBmp.Save(thumb, ImageFormat.Jpeg);
+                }
+                catch { }
+                return shellBmp;
+            }
         }
-        catch { return null; }
+        catch { }
+
+        return null;
     }
 
-    /// <summary>Re-encode về tối đa 1080p, 30 fps, H.264, bỏ âm thanh. Trả đường dẫn file mới hoặc null.</summary>
+    /// <summary>Re-encode vá»  tá»‘i Ä‘a 1080p, 30 fps, H.264, bá»  Ã¢m thanh. Tráº£ Ä‘Æ°á» ng dáº«n file má»›i hoáº·c null.</summary>
     public static async Task<string?> OptimizeAsync(string input)
     {
         var output = Path.Combine(Path.GetDirectoryName(input)!,

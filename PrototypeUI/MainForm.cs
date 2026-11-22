@@ -69,6 +69,13 @@ public sealed class MainForm : Form
         Text = "LiveWall";
         DoubleBuffered = true;
 
+        string appIco = Path.Combine(AppContext.BaseDirectory, "app.ico");
+        if (!File.Exists(appIco)) appIco = Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico");
+        if (File.Exists(appIco))
+        {
+            try { Icon = new Icon(appIco); } catch { }
+        }
+
         _title = Lbl("", Theme.H1, Theme.Text, 328, 20, 364, 30);
         _meta = Lbl("", Theme.Small, Theme.Muted, 328, 50, 364, 20);
 
@@ -141,8 +148,8 @@ public sealed class MainForm : Form
         logo.Disposed += (_, _) => logo.Image?.Dispose();
         var name = Lbl("LiveWall", Theme.Small, Theme.Muted, 34, 0, 200, 36);
 
-        var min = new CaptionButton { Glyph = "\uE921", Location = new Point(880 - 8 - 72, 4), Anchor = AnchorStyles.Top | AnchorStyles.Right };
-        var close = new CaptionButton { Glyph = "\uE8BB", HoverBack = Color.FromArgb(255, 0xC4, 0x2B, 0x1C), Location = new Point(880 - 8 - 36, 4), Anchor = AnchorStyles.Top | AnchorStyles.Right };
+        var close = new CaptionButton { IsClose = true, Dock = DockStyle.Right, Width = 46 };
+        var min = new CaptionButton { IsClose = false, Dock = DockStyle.Right, Width = 46 };
         min.Click += (_, _) => WindowState = FormWindowState.Minimized;
         close.Click += (_, _) => { if (HideOnClose) Hide(); else Close(); };
 
@@ -711,11 +718,27 @@ public sealed class MainForm : Form
         SendMessage(Handle, 0xA1 /* WM_NCLBUTTONDOWN */, 2 /* HTCAPTION */, 0);
     }
 
-    protected override void OnHandleCreated(EventArgs e)
+        protected override void OnHandleCreated(EventArgs e)
     {
         base.OnHandleCreated(e);
-        int round = 2; // DWMWCP_ROUND; Windows 10 bỏ qua
-        DwmSetWindowAttribute(Handle, 33 /* DWMWA_WINDOW_CORNER_PREFERENCE */, ref round, sizeof(int));
+        int round = 2;
+        DwmSetWindowAttribute(Handle, 33, ref round, sizeof(int));
+    }
+
+    private static readonly uint _msgActivateInstance = LiveWallpaper.NativeMethods.RegisterWindowMessage("LiveWall_ActivateMainWindow");
+
+    protected override void WndProc(ref Message m)
+    {
+        if (_msgActivateInstance != 0 && m.Msg == (int)_msgActivateInstance)
+        {
+            Show();
+            if (WindowState == FormWindowState.Minimized)
+                WindowState = FormWindowState.Normal;
+            Activate();
+            BringToFront();
+            return;
+        }
+        base.WndProc(ref m);
     }
 
     protected override void Dispose(bool disposing)

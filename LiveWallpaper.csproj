@@ -7,11 +7,12 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>Assets\LiveWall.ico</ApplicationIcon>
     <PlatformTarget>x64</PlatformTarget>
     <Platforms>x64</Platforms>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ImplicitUsings>enable</ImplicitUsings>
+    <CodePage>65001</CodePage>
+    <ApplicationIcon>app.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,7 +20,7 @@
   </ItemGroup>
 
   <!-- This app hosts WebView2 in WinForms; the package also adds an unused WPF
-       assembly that pulls in a conflicting WindowsBase version. -->
+      assembly that pulls in a conflicting WindowsBase version. -->
   <Target Name="RemoveUnusedWebView2WpfReference" BeforeTargets="ResolveAssemblyReferences">
     <ItemGroup>
       <Reference Remove="@(Reference)" Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf'" />
@@ -27,6 +28,9 @@
   </Target>
 
   <ItemGroup>
+    <None Update="app.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="libmpv-2.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -34,7 +38,7 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <!-- Exclude the standalone prototype project and its nested bin/obj output,
-         then compile only the UI sources shared by this application. -->
+        then compile only the UI sources shared by this application. -->
     <Compile Remove="PrototypeUI\**\*.cs" />
     <Compile Include="PrototypeUI\AppSettings.cs;PrototypeUI\Controls.cs;PrototypeUI\MainForm.cs;PrototypeUI\Tools.cs" />
   </ItemGroup>

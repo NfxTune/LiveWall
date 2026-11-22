@@ -381,19 +381,48 @@ sealed class NavItem : BufferedControl
 /// <summary>Nút nhỏ ở thanh tiêu đề (thu nhỏ, đóng).</summary>
 sealed class CaptionButton : BufferedControl
 {
-    public string Glyph { get; set; } = "";
+    public bool IsClose { get; set; }
     public Color HoverBack { get; set; } = Theme.Active;
 
-    public CaptionButton() { Size = new Size(36, 28); Cursor = Cursors.Hand; }
+    public CaptionButton()
+    {
+        Size = new Size(44, 36);
+        Cursor = Cursors.Hand;
+    }
 
     protected override void Draw(Graphics g)
     {
+        g.SmoothingMode = SmoothingMode.AntiAlias;
+
         if (Hover)
         {
-            using var path = Theme.Round(new Rectangle(0, 0, Width - 1, Height - 1), 4);
-            using var b = new SolidBrush(HoverBack);
-            g.FillPath(b, path);
+            Color bg = IsClose ? Color.FromArgb(232, 17, 35) : HoverBack;
+            using var b = new SolidBrush(bg);
+            g.FillRectangle(b, ClientRectangle);
         }
-        TextRenderer.DrawText(g, Glyph, Theme.Icons, ClientRectangle, Hover ? Theme.Text : Theme.Muted, Theme.TxtCenter);
+
+        int cx = Width / 2;
+        int cy = Height / 2;
+        Color iconColor = Hover ? Color.White : Theme.Text;
+
+        using var pen = new Pen(iconColor, 1.3f)
+        {
+            StartCap = LineCap.Round,
+            EndCap = LineCap.Round
+        };
+
+        if (IsClose)
+        {
+            // Vẽ dấu ✕
+            int r = 5;
+            g.DrawLine(pen, cx - r, cy - r, cx + r, cy + r);
+            g.DrawLine(pen, cx + r, cy - r, cx - r, cy + r);
+        }
+        else
+        {
+            // Vẽ dấu —
+            int r = 5;
+            g.DrawLine(pen, cx - r, cy + 1, cx + r, cy + 1);
+        }
     }
 }

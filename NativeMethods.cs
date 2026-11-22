@@ -263,5 +263,130 @@ namespace LiveWallpaper
         }
 
         #endregion
+
+        #region Memory Management P/Invoke
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SetProcessWorkingSetSize(IntPtr hProcess, IntPtr dwMinimumWorkingSetSize, IntPtr dwMaximumWorkingSetSize);
+
+        [DllImport("psapi.dll")]
+        public static extern int EmptyWorkingSet(IntPtr hProcess);
+
+        #endregion
+
+        #region DWM Desktop Window Manager (Windows 11 Rounded Corners & Dark Mode)
+
+        public const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+        public const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+        public const int DWMWA_BORDER_COLOR = 34;
+
+        public enum DWM_WINDOW_CORNER_PREFERENCE
+        {
+            DWMWCP_DEFAULT = 0,
+            DWMWCP_DONOTROUND = 1,
+            DWMWCP_ROUND = 2,
+            DWMWCP_ROUNDSMALL = 3
+        }
+
+        [DllImport("dwmapi.dll", PreserveSig = true)]
+        public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+        [DllImport("dwmapi.dll", PreserveSig = true)]
+        public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref uint attrValue, int attrSize);
+
+        #endregion
+
+        #region Shell & Window Messages (TaskbarCreated, Shell Thumbnail)
+
+        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        public static extern uint RegisterWindowMessage(string lpString);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool PostMessage(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
+        [ComImport]
+        [Guid("bcc18b79-ba16-442f-80c4-8a59c30c463b")]
+        [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        public interface IShellItemImageFactory
+        {
+            [PreserveSig]
+            int GetImage(
+                [In, MarshalAs(UnmanagedType.Struct)] SIZE size,
+                [In] SIIGBF flags,
+                [Out] out IntPtr phbm);
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct SIZE
+        {
+            public int cx;
+            public int cy;
+            public SIZE(int cx, int cy) { this.cx = cx; this.cy = cy; }
+        }
+
+        [Flags]
+        public enum SIIGBF
+        {
+            SIIGBF_RESIZETOFIT = 0x00,
+            SIIGBF_BIGGERSIZEOK = 0x01,
+            SIIGBF_MEMORYONLY = 0x02,
+            SIIGBF_ICONONLY = 0x04,
+            SIIGBF_THUMBNAILONLY = 0x08,
+            SIIGBF_INCACHEONLY = 0x10,
+            SIIGBF_CROPTOSQUARE = 0x20,
+            SIIGBF_WIDETHUMBNAILS = 0x40,
+            SIIGBF_ICONBACKGROUND = 0x80,
+            SIIGBF_SCALEUP = 0x100
+        }
+
+        [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        public static extern int SHCreateItemFromParsingName(
+            [MarshalAs(UnmanagedType.LPWStr)] string pszPath,
+            IntPtr pbc,
+            [In, MarshalAs(UnmanagedType.LPStruct)] Guid riid,
+            [Out, MarshalAs(UnmanagedType.Interface)] out object ppv);
+
+        private static readonly Guid IShellItemImageFactoryGuid = new Guid("bcc18b79-ba16-442f-80c4-8a59c30c463b");
+
+        /// <summary>
+        /// Trích xuất ảnh thumbnail video native bằng Windows Shell (không cần cài ffmpeg).
+        /// </summary>
+        public static System.Drawing.Bitmap? GetShellThumbnail(string filePath, int width, int height)
+        {
+            if (string.IsNullOrEmpty(filePath) || !System.IO.File.Exists(filePath)) return null;
+            try
+            {
+                int hr = SHCreateItemFromParsingName(filePath, IntPtr.Zero, IShellItemImageFactoryGuid, out object shellItemObj);
+                if (hr == 0 && shellItemObj is IShellItemImageFactory factory)
+                {
+                    hr = factory.GetImage(new SIZE(width, height), SIIGBF.SIIGBF_BIGGERSIZEOK | SIIGBF.SIIGBF_THUMBNAILONLY, out IntPtr hBitmap);
+                    if (hr == 0 && hBitmap != IntPtr.Zero)
+                    {
+                        try
+                        {
+                            using var bmpTemp = System.Drawing.Image.FromHbitmap(hBitmap);
+                            return new System.Drawing.Bitmap(bmpTemp);
+                        }
+                        finally
+                        {
+                            DeleteObject(hBitmap);
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Bỏ qua nếu định dạng không được Windows Explorer hỗ trợ thumbnail
+            }
+            return null;
+        }
+
+        [DllImport("gdi32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool DeleteObject(IntPtr hObject);
+
+        #endregion
     }
 }

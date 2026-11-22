@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 
 namespace LiveWallpaper
@@ -37,15 +37,22 @@ namespace LiveWallpaper
 
             SetOption("wid", windowHandle.ToInt64().ToString());
 
+            // Tối ưu hóa tối đa cho hình nền: GPU decoding, không cache, giải phóng bộ nhớ ngay
             SetOption("vo", "gpu");
             SetOption("hwdec", "auto");
-            // Keep decoder queues and read-ahead buffers small for a wallpaper
-            // that plays continuously in the background.
-            SetOption("vd-lavc-threads", "2");
+            SetOption("cache", "no");                      // Tắt cache stream vào RAM
+            SetOption("demuxer-readahead-secs", "1");      // Chỉ nạp trước tối đa 1 giây video
+            SetOption("demuxer-max-bytes", "16MiB");       // Giới hạn buffer demuxer tối đa 16MB
+            SetOption("demuxer-max-back-bytes", "0");      // Giải phóng ngay lập tức các frame đã chạy qua
+            SetOption("vd-lavc-fast", "yes");              // Giải mã nhanh, tiết kiệm RAM
+            SetOption("vd-lavc-threads", "2");             // Giới hạn số luồng giải mã
             SetOption("hwdec-threads", "2");
-            SetOption("demuxer-max-bytes", "32MiB");
-            SetOption("demuxer-max-back-bytes", "8MiB");
-            SetOption("swapchain-depth", "1");
+            SetOption("swapchain-depth", "1");             // Buffer khung hình tối thiểu
+            SetOption("audio-buffer", "0.2");              // Buffer âm thanh siêu nhỏ (0.2s)
+            SetOption("hr-seek", "no");
+            SetOption("osc", "no");                        // Tắt On-Screen-Controller không cần thiết
+            SetOption("osd-bar", "no");                    // Tắt OSD bar
+            SetOption("load-scripts", "no");               // Không load lua scripts để tiết kiệm RAM
             SetOption("loop-file", "inf");
             SetOption("mute", _isMuted ? "yes" : "no");
             SetOption("volume", _volume.ToString());
